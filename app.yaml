@@ -8,6 +8,6 @@ handlers:
 
 #[START env]
 env_variables:
-  DATASET_ID: second_dataser
-  TABLE_ID: append
+  DATASET_ID: searce_poc_vuukle
+  TABLE_ID: page_impressions
 #[END env]

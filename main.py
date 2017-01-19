@@ -1,4 +1,5 @@
-import webapp2, json, logging, os, time, uuid, hashlib, cgi
+import webapp2, json, logging, os, time, uuid, hashlib, cgi , sys
+import urllib 
 
 from google.cloud import bigquery
 from google.appengine.api import memcache, taskqueue
@@ -67,15 +68,24 @@ def stream_data(dataset_name, table_name, json_data, time_stamp = time.time()):
 class MainHandler(webapp2.RequestHandler):
     def get(self):
         self.response.headers.add_header("Access-Control-Allow-Origin", "*")
-        s='http://345.34.5.34.5/insert?callback=jQuery21402542612166112883_1484128195262&{"hashed_article_url":"indianexpress.com/elections/punjab-assembly-elections-2017/kejriwal-rubbishes-rumours-says-cm-of-punjab-will-be-from-punjab-4469232/","hostname":"2e5a47ef-15f6-4eec-a685-65a6d0ed00d0","pubdomain":"indianexpress.com","article_id":"4469232","hashed_email":"$485ebce-af23-4d88-9163-5fa86b7227ca","tags":"elections,%20punjab-assembly-elections-2017","action":"view_page","os":"Linux","device":"Desktop","browser":"Chrome","refDomain":"indianexpresscom","articleTitle":"Kejriwal%20rubbishes%20rumours,%20says%20CM%20of%20Punjab%20will%20be%20from%20Punjab","articleImg":"http%3A//images.indianexpress.com/2017/01/kejriwal_4801.jpg%3Fw%3D100","referrer":"name=Online%20IE","sessionId":"3ec60a44-bd22-4040-bf78-1d719f6ed73e","version":"4.20"}&_=1484128195263'
+        s=self.request.url
+        s=urllib.unquote(s).decode('utf8')
+        #self.response.write(s)
         start = s.index('&') + len('&')
         end = s.index('&', start )
-        bq=s[start:end]
+        b1=s[start:end]
+        #bq=parse.unquotes(b1)
+        b1=b1.replace("'",'"')
+        #self.response.write(b1)
+        #data=json.dumps(b1)
+        #self.response.write(data)
         #print form_fields
         ## get example.com?bq=blah
         
         ts=str(time.time())
-        b = json.loads(bq)
+        b = json.loads(b1)
+        #b.replace("'",'"')
+        #self.response.write(b)
         logging.debug('json load: {}'.format(b))
 
         if len(b) > 0:
@@ -94,6 +104,6 @@ class MainHandler(webapp2.RequestHandler):
 		
 		
 app = webapp2.WSGIApplication([
-    ('/', MainHandler),
+    ('/bq-streamer', MainHandler),
     ], debug=True)
     
