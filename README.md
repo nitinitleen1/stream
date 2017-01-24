@@ -90,63 +90,18 @@ Included is also a class to query the entire BigQuery table, in production you w
 
 Visiting `http://your-app-id.appspot.com/bq-get` will get you the BQ table in JSON format - it has no caching enabled so it will also be the freshest results.
 
-## Hash
 
-To protect privacy, a hash also has to be supplied.  This is generated via the secret salt name you should change in setup to something unique for you, and then generate it in python via:
-
-```
-import hashlib
-# your query
-q = "SELECT * FROM %s.%s"
-# the unique secret word in the app.yaml environment vars
-salt = "SECRETWORD"
-
-## use this in the API call for parameter `hash`
-hashlib.sha224(q+salt).hexdigest()
-
-```
- Or view the expected hash in the error logs when you attempt connection
-
- ## Limit
-
- By default it will return the most recent record of the table - pass `limit=X` to get more.
-
- Example:
-
- `http://your-app-id.appspot.com/bq-get?limit=1000&hash=63780cbd6c3f6e632b57d9f8f70ea7edcd3c6eb5cbdd1b3183ba28b6`
-
-
-By default the query is:
-
-```
-    query = 'SELECT * FROM %s.%s LIMIT %s' % (datasetId, tableId, limit)
-```
-
-You can use your own query by supplying a `q` parameter to the URL.  It uses Standard SQL, not legacy.  Use the `%s.%s` in your query that will be filled in with the correct dataset and tableId.  The limit URL parameter is ignored when supplying your own SQL.
-
-`http://your-app-id.appspot.com/bq-get?hash=XXXXXq=SELECT * FROM %s.%s LIMIT 10`
 
 
 Applications can then use this data for display.  
 
-* Poll every minute from GoogleSheets https://cloud.google.com/solutions/real-time/fluentd-bigquery
-* Js: http://epochjs.github.io/epoch/
+* `Poll every minute from GoogleSheets` https://cloud.google.com/solutions/real-time/fluentd-bigquery
+* `Js`: http://epochjs.github.io/epoch/
 * https://www.quora.com/What-s-a-good-real-time-data-visualization-framework 
 * http://stackoverflow.com/questions/33480302/creating-a-shiny-app-with-real-time-data
 * http://shiny.rstudio.com/gallery/reactive-poll-and-file-reader.html
 * http://stackoverflow.com/questions/40424407/real-time-chart-on-r-shiny
 
-# Sending hits from Google Tag Manager
 
-```
-<script>
-    
-	var bqArray = {};
-        
-  bqArray["fieldname"] = "{{dataLayer}}";
-  bqArray["fieldname2"] = "{{dataLayer2}}";
-  	
-  jQuery.post("https://YOUR-PROJECT-ID.appspot.com/bq-streamer", {"bq":JSON.stringify(bqArray)});
 
-</script>
-```
+
