@@ -84,11 +84,7 @@ For more information on Python on App Engine:
 * 500 tasks per second per queue = 1.8M per hour = 43.2M per day
 * 100k rows per second per BQ table
 
-# Using the BigQuery realtime
 
-Included is also a class to query the entire BigQuery table, in production you would want to limit query to greater than a timestamp in ts to avoid it being too large.
-
-Visiting `http://your-app-id.appspot.com/bq-get` will get you the BQ table in JSON format - it has no caching enabled so it will also be the freshest results.
 
 
 
