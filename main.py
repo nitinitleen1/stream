@@ -1,6 +1,6 @@
 import webapp2, json, logging, os, time, uuid, hashlib, cgi , sys
 import urllib 
-
+from collections import OrderedDict
 from google.cloud import bigquery
 from google.appengine.api import memcache, taskqueue
 from datetime import date, timedelta
@@ -50,17 +50,12 @@ def stream_data(dataset_name, table_name, json_data, time_stamp = time.strftime(
     table.reload()
 
     ## get the names of schema
-    schema = table.schema
-    schema_names = [o.name for o in schema]
-
-    logging.debug('BQ Schema: {}'.format(schema_names))
-
-    
-    rows = [(data[x] for x in schema_names)]
-
-    
-    errors = table.insert_data(rows, row_ids = str(uuid.uuid4()))
-
+    temp=list()
+    for key in data:
+        temp.append(data[key])
+        #rows = [data]
+        #print rows
+    errors = table.insert_data([temp])
     if not errors:
     	logging.debug('Loaded 1 row into {}:{}'.format(dataset_name, table_name))
     else:
@@ -72,14 +67,14 @@ class MainHandler(webapp2.RequestHandler):
         s=self.request.url
         s=urllib.unquote(s).decode('utf8')
         #self.response.write(s)
-        try:
-            start = s.index('&') + len('&')
-            end = s.index('&_', start )
-            b1=s[start:end]
+        
+        start = s.index('&') + len('&')
+        end = s.index('&_', start )
+        b1=s[start:end]
         #bq=parse.unquotes(b1)
-            b1=b1.replace("'",'"')
-        except:
-            quit()
+        b1=b1.replace("'",'"')
+        
+            
         #self.response.write(b1)
         #data=json.dumps(b1)
         #self.response.write(data)
@@ -87,10 +82,9 @@ class MainHandler(webapp2.RequestHandler):
         ## get example.com?bq=blah
         
         ts=str(time.strftime("%c"))
-        try:
-            b = json.loads(b1)
-        except:
-            quit()
+        
+        b = json.loads(b1,object_pairs_hook=OrderedDict)
+        
         #b.replace("'",'"')
         #self.response.write(b)
         logging.debug('json load: {}'.format(b))
@@ -121,7 +115,7 @@ class MainHandler(webapp2.RequestHandler):
         #bq=parse.unquotes(b1)
             b1=b1.replace("'",'"')
         except:
-            quit()
+            return
         #self.response.write(b1)
         #data=json.dumps(b1)
         #self.response.write(data)
@@ -138,14 +132,15 @@ class BqHandler(webapp2.RequestHandler):
     def post(self):
 
         ## get example.com/bq-task?bq=blah
-        b = self.request.get("bq")
+        b1 = self.request.get("bq")
         ts = self.request.get("ts")
         try:
-            b = json.loads(b)
-
-            logging.debug('json load: {}'.format(b))
+            b = json.loads(b1,object_pairs_hook=OrderedDict)
+            logging.debug('json load: {}'.format(b)) 
         except:
-            quit()    
+            logging.debug('Cannot able to load')
+            return    
+        
 
         if len(b) > 0:
             datasetId = os.environ['DATASET_ID']
