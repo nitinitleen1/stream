@@ -37,13 +37,14 @@ def sync_query(query):
 
 
 
-def stream_data(dataset_name, table_name, json_data, time_stamp = time.time()):
+def stream_data(dataset_name, table_name, json_data, time_stamp = time.strftime("%c")):
     bigquery_client = bigquery.Client()
     dataset = bigquery_client.dataset(dataset_name)
     table = dataset.table(table_name)
     data = json_data
+    time_stamp1=time.strftime("%c")
 
-    data['ts'] = time_stamp
+    data['timestamp'] = time_stamp1
 
     # Reload the table to get the schema.
     table.reload()
@@ -71,19 +72,25 @@ class MainHandler(webapp2.RequestHandler):
         s=self.request.url
         s=urllib.unquote(s).decode('utf8')
         #self.response.write(s)
-        start = s.index('&') + len('&')
-        end = s.index('&', start )
-        b1=s[start:end]
+        try:
+            start = s.index('&') + len('&')
+            end = s.index('&_', start )
+            b1=s[start:end]
         #bq=parse.unquotes(b1)
-        b1=b1.replace("'",'"')
+            b1=b1.replace("'",'"')
+        except:
+            quit()
         #self.response.write(b1)
         #data=json.dumps(b1)
         #self.response.write(data)
         #print form_fields
         ## get example.com?bq=blah
         
-        ts=str(time.time())
-        b = json.loads(b1)
+        ts=str(time.strftime("%c"))
+        try:
+            b = json.loads(b1)
+        except:
+            quit()
         #b.replace("'",'"')
         #self.response.write(b)
         logging.debug('json load: {}'.format(b))
@@ -100,10 +107,58 @@ class MainHandler(webapp2.RequestHandler):
 
 
 
-		
-		
-		
+    def post(self):
+        self.response.headers.add_header("Access-Control-Allow-Origin", "*")
+
+        
+        s=self.request.url
+        s=urllib.unquote(s).decode('utf8')
+        #self.response.write(s)
+        try:
+            start = s.index('&') + len('&')
+            end = s.index('&_', start )
+            b1=s[start:end]
+        #bq=parse.unquotes(b1)
+            b1=b1.replace("'",'"')
+        except:
+            quit()
+        #self.response.write(b1)
+        #data=json.dumps(b1)
+        #self.response.write(data)
+        #print form_fields
+        ## get example.com?bq=blah
+        
+        #ts=str(time.time())
+        #b = json.loads(b1)
+        #b.replace("'",'"')
+        #self.response.write(b)
+        task = taskqueue.add(url='/bq-task', params={'bq': b1, 'ts': str(time.time())})
+
+class BqHandler(webapp2.RequestHandler):
+    def post(self):
+
+        ## get example.com/bq-task?bq=blah
+        b = self.request.get("bq")
+        ts = self.request.get("ts")
+        try:
+            b = json.loads(b)
+
+            logging.debug('json load: {}'.format(b))
+        except:
+            quit()    
+
+        if len(b) > 0:
+            datasetId = os.environ['DATASET_ID']
+            tableId   = os.environ['TABLE_ID']
+
+            today = date.today().strftime("%Y%m%d")
+
+            tableId = "%s$%s"%(tableId, today)
+
+            stream_data(datasetId, tableId, b, ts)
+
+    		
 app = webapp2.WSGIApplication([
     ('/bq-streamer', MainHandler),
-    ], debug=True)
-    
+    ('/bq-task', BqHandler),
+], debug=True)
