@@ -72,32 +72,11 @@ class MainHandler(webapp2.RequestHandler):
         end = s.index('&_', start )
         b1=s[start:end]
         #bq=parse.unquotes(b1)
-        b1=b1.replace("'",'"')
+        b1=b1.replace("'",'"')                    
         
-            
-        #self.response.write(b1)
-        #data=json.dumps(b1)
-        #self.response.write(data)
-        #print form_fields
-        ## get example.com?bq=blah
+        task = taskqueue.add(url='/bq-task', params={'bq': b1, 'ts': str(time.time())})
         
-        ts=str(time.strftime("%c"))
         
-        b = json.loads(b1,object_pairs_hook=OrderedDict)
-        
-        #b.replace("'",'"')
-        #self.response.write(b)
-        logging.debug('json load: {}'.format(b))
-
-        if len(b) > 0:
-            datasetId = os.environ['DATASET_ID']
-            tableId   = os.environ['TABLE_ID']
-
-            today = date.today().strftime("%Y%m%d")
-
-            tableId = "%s$%s"%(tableId, today)
-
-            stream_data(datasetId, tableId, b, ts)
 
 
 
@@ -116,11 +95,7 @@ class MainHandler(webapp2.RequestHandler):
             b1=b1.replace("'",'"')
         except:
             return
-        #self.response.write(b1)
-        #data=json.dumps(b1)
-        #self.response.write(data)
-        #print form_fields
-        ## get example.com?bq=blah
+        
         
         #ts=str(time.time())
         #b = json.loads(b1)
