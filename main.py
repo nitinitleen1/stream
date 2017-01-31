@@ -127,8 +127,86 @@ class BqHandler(webapp2.RequestHandler):
 
             stream_data(datasetId, tableId, b, ts)
 
+
+
+class PublishHandler(webapp2.RequestHandler):
+    def get(self):
+        #flag=1
+        self.response.headers.add_header("Access-Control-Allow-Origin", "*")
+        s=self.request.url
+        s=urllib.unquote(s).decode('utf8')
+        #self.response.write(s)
+        pubsub_client = pubsub.Client()
+        start = s.index('&') + len('&')
+        end = s.index('&_', start )
+        b1=s[start:end]
+        #bq=parse.unquotes(b1)
+        b1=b1.replace("'",'"')
+        #logging.debug(b1)                            
+        #for topic in pubsub_client.list_topics():
+        #    if topic.name=='my-new-topic':
+        #        flag=0        
+        topic_name = 'my-new-topic'
+        topic = pubsub_client.topic(topic_name)
+        # if flag==0:                                        
+        #     topic.create()
+        #     print('Topic {} created.'.format(topic.name))
+        #     b1 = b1.encode('utf-8')
+        #     message_id = topic.publish(b1)
+        #     logging.debug('Message {} published.'.format(message_id))        
+        
+        
+        # else:            
+        #     # Data must be a bytestring
+        b1 = b1.encode('utf-8')
+
+        message_id = topic.publish(b1)
+
+        logging.debug('Message {} published outside loop.'.format(message_id))
+
+
+    def post(self):
+        self.response.headers.add_header("Access-Control-Allow-Origin", "*")
+        pubsub_client = pubsub.Client()
+        #flag=1
+        s=self.request.url
+        s=urllib.unquote(s).decode('utf8')
+        #self.response.write(s)
+        try:
+            start = s.index('&') + len('&')
+            end = s.index('&_', start )
+            b1=s[start:end]
+            #bq=parse.unquotes(b1)
+            b1=b1.replace("'",'"')
+        except:
+            return
+        
+        #for topic in pubsub_client.list_topics():
+        #    if topic.name=='my-new-topic':
+        #        flag=0        
+        topic_name = 'my-new-topic'
+        topic = pubsub_client.topic(topic_name)
+        # if flag==0:                
+        #     topic.create()
+        #     #self.response.write('Topic {} created.'.format(topic.name))
+        #     b1 = b1.encode('utf-8')
+        #     message_id = topic.publish(b1)
+        #     #self.response.write('Message {} published.'.format(message_id))        
+        
+        
+        # else:            
+        #     # Data must be a bytestring
+        b1 = b1.encode('utf-8')
+
+        message_id = topic.publish(b1)
+
+        logging.debug('Message {} published.'.format(message_id))        
+        
+
+
     		
 app = webapp2.WSGIApplication([
     ('/bq-streamer', MainHandler),
     ('/bq-task', BqHandler),
+    ('/bq-publish', PublishHandler),
 ], debug=True)
