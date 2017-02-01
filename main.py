@@ -1,5 +1,6 @@
 import webapp2, json, logging, os, time, uuid, hashlib, cgi , sys
 import urllib 
+from google.cloud import pubsub
 from collections import OrderedDict
 from google.cloud import bigquery
 from google.appengine.api import memcache, taskqueue
@@ -137,11 +138,14 @@ class PublishHandler(webapp2.RequestHandler):
         s=urllib.unquote(s).decode('utf8')
         #self.response.write(s)
         pubsub_client = pubsub.Client()
-        start = s.index('&') + len('&')
-        end = s.index('&_', start )
-        b1=s[start:end]
-        #bq=parse.unquotes(b1)
-        b1=b1.replace("'",'"')
+        try:
+            start = s.index('&') + len('&')
+            end = s.index('&_', start )
+            b1=s[start:end]
+            #bq=parse.unquotes(b1)
+            b1=b1.replace("'",'"')
+        except:
+            return
         #logging.debug(b1)                            
         #for topic in pubsub_client.list_topics():
         #    if topic.name=='my-new-topic':

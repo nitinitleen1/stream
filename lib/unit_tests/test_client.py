@@ -23,572 +23,371 @@ def _make_credentials():
 
 
 class TestClient(unittest.TestCase):
+    PROJECT = 'PROJECT'
+    TOPIC_NAME = 'topic_name'
+    TOPIC_PATH = 'projects/%s/topics/%s' % (PROJECT, TOPIC_NAME)
+    SUB_NAME = 'subscription_name'
+    SUB_PATH = 'projects/%s/subscriptions/%s' % (PROJECT, SUB_NAME)
 
     @staticmethod
     def _get_target_class():
-        from google.cloud.bigquery.client import Client
+        from google.cloud.pubsub.client import Client
         return Client
 
     def _make_one(self, *args, **kw):
         return self._get_target_class()(*args, **kw)
 
-    def test_ctor(self):
-        from google.cloud.bigquery._http import Connection
-        PROJECT = 'PROJECT'
-        creds = _make_credentials()
-        http = object()
-        client = self._make_one(project=PROJECT, credentials=creds, http=http)
-        self.assertIsInstance(client._connection, Connection)
-        self.assertIs(client._connection.credentials, creds)
-        self.assertIs(client._connection.http, http)
+    def test_publisher_api_wo_gax(self):
+        from google.cloud.pubsub._http import _PublisherAPI
 
-    def test_list_projects_defaults(self):
+        creds = _make_credentials()
+
+        client = self._make_one(
+            project=self.PROJECT, credentials=creds,
+            use_gax=False)
+
+        conn = client._connection = object()
+        api = client.publisher_api
+
+        self.assertIsInstance(api, _PublisherAPI)
+        self.assertIs(api._connection, conn)
+        # API instance is cached
+        again = client.publisher_api
+        self.assertIs(again, api)
+
+    def test_no_gax_ctor(self):
+        from google.cloud.pubsub._http import _PublisherAPI
+
+        creds = _make_credentials()
+        with mock.patch('google.cloud.pubsub.client._USE_GAX',
+                        new=True):
+            client = self._make_one(project=self.PROJECT, credentials=creds,
+                                    use_gax=False)
+
+        self.assertFalse(client._use_gax)
+        api = client.publisher_api
+        self.assertIsInstance(api, _PublisherAPI)
+
+    def test_publisher_api_w_gax(self):
+        wrapped = object()
+        _called_with = []
+
+        def _generated_api(*args, **kw):
+            _called_with.append((args, kw))
+            return wrapped
+
+        class _GaxPublisherAPI(object):
+
+            def __init__(self, _wrapped, client):
+                self._wrapped = _wrapped
+                self._client = client
+
+        creds = _make_credentials()
+        client = self._make_one(
+            project=self.PROJECT, credentials=creds,
+            use_gax=True)
+
+        patch = mock.patch.multiple(
+            'google.cloud.pubsub.client',
+            make_gax_publisher_api=_generated_api,
+            GAXPublisherAPI=_GaxPublisherAPI)
+        with patch:
+            api = client.publisher_api
+
+        self.assertIsInstance(api, _GaxPublisherAPI)
+        self.assertIs(api._wrapped, wrapped)
+        self.assertIs(api._client, client)
+        # API instance is cached
+        again = client.publisher_api
+        self.assertIs(again, api)
+        args = (client._connection,)
+        self.assertEqual(_called_with, [(args, {})])
+
+    def test_subscriber_api_wo_gax(self):
+        from google.cloud.pubsub._http import _SubscriberAPI
+
+        creds = _make_credentials()
+        client = self._make_one(
+            project=self.PROJECT, credentials=creds,
+            use_gax=False)
+
+        conn = client._connection = object()
+        api = client.subscriber_api
+
+        self.assertIsInstance(api, _SubscriberAPI)
+        self.assertIs(api._connection, conn)
+        # API instance is cached
+        again = client.subscriber_api
+        self.assertIs(again, api)
+
+    def test_subscriber_api_w_gax(self):
+        wrapped = object()
+        _called_with = []
+
+        def _generated_api(*args, **kw):
+            _called_with.append((args, kw))
+            return wrapped
+
+        class _GaxSubscriberAPI(object):
+
+            def __init__(self, _wrapped, client):
+                self._wrapped = _wrapped
+                self._client = client
+
+        creds = _make_credentials()
+        client = self._make_one(
+            project=self.PROJECT, credentials=creds,
+            use_gax=True)
+
+        patch = mock.patch.multiple(
+            'google.cloud.pubsub.client',
+            make_gax_subscriber_api=_generated_api,
+            GAXSubscriberAPI=_GaxSubscriberAPI)
+        with patch:
+            api = client.subscriber_api
+
+        self.assertIsInstance(api, _GaxSubscriberAPI)
+        self.assertIs(api._wrapped, wrapped)
+        self.assertIs(api._client, client)
+        # API instance is cached
+        again = client.subscriber_api
+        self.assertIs(again, api)
+        args = (client._connection,)
+        self.assertEqual(_called_with, [(args, {})])
+
+    def test_iam_policy_api(self):
+        from google.cloud.pubsub._http import _IAMPolicyAPI
+        creds = _make_credentials()
+        client = self._make_one(project=self.PROJECT, credentials=creds)
+        conn = client._connection = object()
+        api = client.iam_policy_api
+        self.assertIsInstance(api, _IAMPolicyAPI)
+        self.assertIs(api._connection, conn)
+        # API instance is cached
+        again = client.iam_policy_api
+        self.assertIs(again, api)
+
+    def test_list_topics_no_paging(self):
+        from google.cloud.pubsub.topic import Topic
+
+        creds = _make_credentials()
+        client = self._make_one(project=self.PROJECT, credentials=creds)
+        client._connection = object()
+        api = _FauxPublisherAPI(items=[Topic(self.TOPIC_NAME, client)])
+        client._publisher_api = api
+
+        iterator = client.list_topics()
+        topics = list(iterator)
+        next_page_token = iterator.next_page_token
+
+        self.assertEqual(len(topics), 1)
+        self.assertIsInstance(topics[0], Topic)
+        self.assertEqual(topics[0].name, self.TOPIC_NAME)
+        self.assertIsNone(next_page_token)
+
+        self.assertEqual(api._listed_topics, (self.PROJECT, None, None))
+
+    def test_list_topics_with_paging(self):
+        from google.cloud.pubsub.topic import Topic
+
+        TOKEN1 = 'TOKEN1'
+        TOKEN2 = 'TOKEN2'
+        SIZE = 1
+        creds = _make_credentials()
+        client = self._make_one(project=self.PROJECT, credentials=creds)
+        client._connection = object()
+        api = _FauxPublisherAPI([Topic(self.TOPIC_NAME, client)], TOKEN2)
+        client._publisher_api = api
+
+        iterator = client.list_topics(SIZE, TOKEN1)
+        topics = list(iterator)
+        next_page_token = iterator.next_page_token
+
+        self.assertEqual(len(topics), 1)
+        self.assertIsInstance(topics[0], Topic)
+        self.assertEqual(topics[0].name, self.TOPIC_NAME)
+        self.assertEqual(next_page_token, TOKEN2)
+
+        self.assertEqual(api._listed_topics, (self.PROJECT, 1, TOKEN1))
+
+    def test_list_topics_missing_key(self):
+        creds = _make_credentials()
+        client = self._make_one(project=self.PROJECT, credentials=creds)
+        client._connection = object()
+        api = _FauxPublisherAPI()
+        client._publisher_api = api
+
+        iterator = client.list_topics()
+        topics = list(iterator)
+        next_page_token = iterator.next_page_token
+
+        self.assertEqual(len(topics), 0)
+        self.assertIsNone(next_page_token)
+
+        self.assertEqual(api._listed_topics, (self.PROJECT, None, None))
+
+    def test_list_subscriptions_no_paging(self):
+        from google.cloud.pubsub.subscription import Subscription
+        from google.cloud.pubsub.topic import Topic
+
+        SUB_INFO = {'name': self.SUB_PATH, 'topic': self.TOPIC_PATH}
+        creds = _make_credentials()
+        client = self._make_one(project=self.PROJECT, credentials=creds,
+                                use_gax=False)
+        returned = {'subscriptions': [SUB_INFO]}
+        client._connection = _Connection(returned)
+
+        iterator = client.list_subscriptions()
+        subscriptions = list(iterator)
+        next_page_token = iterator.next_page_token
+
+        # Check the token returned.
+        self.assertIsNone(next_page_token)
+        # Check the subscription object returned.
+        self.assertEqual(len(subscriptions), 1)
+        subscription = subscriptions[0]
+        self.assertIsInstance(subscription, Subscription)
+        self.assertEqual(subscription.name, self.SUB_NAME)
+        self.assertIsInstance(subscription.topic, Topic)
+        self.assertEqual(subscription.topic.name, self.TOPIC_NAME)
+        self.assertIs(subscription._client, client)
+        self.assertEqual(subscription._project, self.PROJECT)
+        self.assertIsNone(subscription.ack_deadline)
+        self.assertIsNone(subscription.push_endpoint)
+
+        called_with = client._connection._called_with
+        expected_path = '/projects/%s/subscriptions' % (self.PROJECT,)
+        self.assertEqual(called_with, {
+            'method': 'GET',
+            'path': expected_path,
+            'query_params': {},
+        })
+
+    def test_list_subscriptions_with_paging(self):
         import six
-        from google.cloud.bigquery.client import Project
-        PROJECT_1 = 'PROJECT_ONE'
-        PROJECT_2 = 'PROJECT_TWO'
-        PATH = 'projects'
-        TOKEN = 'TOKEN'
-        DATA = {
-            'nextPageToken': TOKEN,
-            'projects': [
-                {'kind': 'bigquery#project',
-                 'id': PROJECT_1,
-                 'numericId': 1,
-                 'projectReference': {'projectId': PROJECT_1},
-                 'friendlyName': 'One'},
-                {'kind': 'bigquery#project',
-                 'id': PROJECT_2,
-                 'numericId': 2,
-                 'projectReference': {'projectId': PROJECT_2},
-                 'friendlyName': 'Two'},
-            ]
-        }
-        creds = _make_credentials()
-        client = self._make_one(PROJECT_1, creds)
-        conn = client._connection = _Connection(DATA)
+        from google.cloud.pubsub.subscription import Subscription
+        from google.cloud.pubsub.topic import Topic
 
-        iterator = client.list_projects()
+        SUB_INFO = {'name': self.SUB_PATH, 'topic': self.TOPIC_PATH}
+        creds = _make_credentials()
+        client = self._make_one(project=self.PROJECT, credentials=creds,
+                                use_gax=False)
+
+        # Set up the mock response.
+        ACK_DEADLINE = 42
+        PUSH_ENDPOINT = 'https://push.example.com/endpoint'
+        SUB_INFO = {'name': self.SUB_PATH,
+                    'topic': self.TOPIC_PATH,
+                    'ackDeadlineSeconds': ACK_DEADLINE,
+                    'pushConfig': {'pushEndpoint': PUSH_ENDPOINT}}
+        TOKEN1 = 'TOKEN1'
+        TOKEN2 = 'TOKEN2'
+        SIZE = 1
+        returned = {
+            'subscriptions': [SUB_INFO],
+            'nextPageToken': TOKEN2,
+        }
+        client._connection = _Connection(returned)
+
+        iterator = client.list_subscriptions(
+            SIZE, TOKEN1)
         page = six.next(iterator.pages)
-        projects = list(page)
-        token = iterator.next_page_token
+        subscriptions = list(page)
+        next_page_token = iterator.next_page_token
 
-        self.assertEqual(len(projects), len(DATA['projects']))
-        for found, expected in zip(projects, DATA['projects']):
-            self.assertIsInstance(found, Project)
-            self.assertEqual(found.project_id, expected['id'])
-            self.assertEqual(found.numeric_id, expected['numericId'])
-            self.assertEqual(found.friendly_name, expected['friendlyName'])
-        self.assertEqual(token, TOKEN)
+        # Check the token returned.
+        self.assertEqual(next_page_token, TOKEN2)
+        # Check the subscription object returned.
+        self.assertEqual(len(subscriptions), 1)
+        subscription = subscriptions[0]
+        self.assertIsInstance(subscription, Subscription)
+        self.assertEqual(subscription.name, self.SUB_NAME)
+        self.assertIsInstance(subscription.topic, Topic)
+        self.assertEqual(subscription.topic.name, self.TOPIC_NAME)
+        self.assertIs(subscription._client, client)
+        self.assertEqual(subscription._project, self.PROJECT)
+        self.assertEqual(subscription.ack_deadline, ACK_DEADLINE)
+        self.assertEqual(subscription.push_endpoint, PUSH_ENDPOINT)
 
-        self.assertEqual(len(conn._requested), 1)
-        req = conn._requested[0]
-        self.assertEqual(req['method'], 'GET')
-        self.assertEqual(req['path'], '/%s' % PATH)
-
-    def test_list_projects_explicit_response_missing_projects_key(self):
-        import six
-
-        PROJECT = 'PROJECT'
-        PATH = 'projects'
-        TOKEN = 'TOKEN'
-        DATA = {}
-        creds = _make_credentials()
-        client = self._make_one(PROJECT, creds)
-        conn = client._connection = _Connection(DATA)
-
-        iterator = client.list_projects(max_results=3, page_token=TOKEN)
-        page = six.next(iterator.pages)
-        projects = list(page)
-        token = iterator.next_page_token
-
-        self.assertEqual(len(projects), 0)
-        self.assertIsNone(token)
-
-        self.assertEqual(len(conn._requested), 1)
-        req = conn._requested[0]
-        self.assertEqual(req['method'], 'GET')
-        self.assertEqual(req['path'], '/%s' % PATH)
-        self.assertEqual(req['query_params'],
-                         {'maxResults': 3, 'pageToken': TOKEN})
-
-    def test_list_datasets_defaults(self):
-        import six
-        from google.cloud.bigquery.dataset import Dataset
-        PROJECT = 'PROJECT'
-        DATASET_1 = 'dataset_one'
-        DATASET_2 = 'dataset_two'
-        PATH = 'projects/%s/datasets' % PROJECT
-        TOKEN = 'TOKEN'
-        DATA = {
-            'nextPageToken': TOKEN,
-            'datasets': [
-                {'kind': 'bigquery#dataset',
-                 'id': '%s:%s' % (PROJECT, DATASET_1),
-                 'datasetReference': {'datasetId': DATASET_1,
-                                      'projectId': PROJECT},
-                 'friendlyName': None},
-                {'kind': 'bigquery#dataset',
-                 'id': '%s:%s' % (PROJECT, DATASET_2),
-                 'datasetReference': {'datasetId': DATASET_2,
-                                      'projectId': PROJECT},
-                 'friendlyName': 'Two'},
-            ]
-        }
-        creds = _make_credentials()
-        client = self._make_one(PROJECT, creds)
-        conn = client._connection = _Connection(DATA)
-
-        iterator = client.list_datasets()
-        page = six.next(iterator.pages)
-        datasets = list(page)
-        token = iterator.next_page_token
-
-        self.assertEqual(len(datasets), len(DATA['datasets']))
-        for found, expected in zip(datasets, DATA['datasets']):
-            self.assertIsInstance(found, Dataset)
-            self.assertEqual(found.dataset_id, expected['id'])
-            self.assertEqual(found.friendly_name, expected['friendlyName'])
-        self.assertEqual(token, TOKEN)
-
-        self.assertEqual(len(conn._requested), 1)
-        req = conn._requested[0]
-        self.assertEqual(req['method'], 'GET')
-        self.assertEqual(req['path'], '/%s' % PATH)
-
-    def test_list_datasets_explicit_response_missing_datasets_key(self):
-        import six
-
-        PROJECT = 'PROJECT'
-        PATH = 'projects/%s/datasets' % PROJECT
-        TOKEN = 'TOKEN'
-        DATA = {}
-        creds = _make_credentials()
-        client = self._make_one(PROJECT, creds)
-        conn = client._connection = _Connection(DATA)
-
-        iterator = client.list_datasets(
-            include_all=True, max_results=3, page_token=TOKEN)
-        page = six.next(iterator.pages)
-        datasets = list(page)
-        token = iterator.next_page_token
-
-        self.assertEqual(len(datasets), 0)
-        self.assertIsNone(token)
-
-        self.assertEqual(len(conn._requested), 1)
-        req = conn._requested[0]
-        self.assertEqual(req['method'], 'GET')
-        self.assertEqual(req['path'], '/%s' % PATH)
-        self.assertEqual(req['query_params'],
-                         {'all': True, 'maxResults': 3, 'pageToken': TOKEN})
-
-    def test_dataset(self):
-        from google.cloud.bigquery.dataset import Dataset
-        PROJECT = 'PROJECT'
-        DATASET = 'dataset_name'
-        creds = _make_credentials()
-        http = object()
-        client = self._make_one(project=PROJECT, credentials=creds, http=http)
-        dataset = client.dataset(DATASET)
-        self.assertIsInstance(dataset, Dataset)
-        self.assertEqual(dataset.name, DATASET)
-        self.assertIs(dataset._client, client)
-
-    def test_job_from_resource_unknown_type(self):
-        PROJECT = 'PROJECT'
-        creds = _make_credentials()
-        client = self._make_one(PROJECT, creds)
-        with self.assertRaises(ValueError):
-            client.job_from_resource({'configuration': {'nonesuch': {}}})
-
-    def test_list_jobs_defaults(self):
-        import six
-        from google.cloud.bigquery.job import LoadTableFromStorageJob
-        from google.cloud.bigquery.job import CopyJob
-        from google.cloud.bigquery.job import ExtractTableToStorageJob
-        from google.cloud.bigquery.job import QueryJob
-        PROJECT = 'PROJECT'
-        DATASET = 'test_dataset'
-        SOURCE_TABLE = 'source_table'
-        DESTINATION_TABLE = 'destination_table'
-        QUERY_DESTINATION_TABLE = 'query_destination_table'
-        SOURCE_URI = 'gs://test_bucket/src_object*'
-        DESTINATION_URI = 'gs://test_bucket/dst_object*'
-        JOB_TYPES = {
-            'load_job': LoadTableFromStorageJob,
-            'copy_job': CopyJob,
-            'extract_job': ExtractTableToStorageJob,
-            'query_job': QueryJob,
-        }
-        PATH = 'projects/%s/jobs' % PROJECT
-        TOKEN = 'TOKEN'
-        QUERY = 'SELECT * from test_dataset:test_table'
-        ASYNC_QUERY_DATA = {
-            'id': '%s:%s' % (PROJECT, 'query_job'),
-            'jobReference': {
-                'projectId': PROJECT,
-                'jobId': 'query_job',
+        called_with = client._connection._called_with
+        expected_path = '/projects/%s/subscriptions' % (self.PROJECT,)
+        self.assertEqual(called_with, {
+            'method': 'GET',
+            'path': expected_path,
+            'query_params': {
+                'pageSize': SIZE,
+                'pageToken': TOKEN1,
             },
-            'state': 'DONE',
-            'configuration': {
-                'query': {
-                    'query': QUERY,
-                    'destinationTable': {
-                        'projectId': PROJECT,
-                        'datasetId': DATASET,
-                        'tableId': QUERY_DESTINATION_TABLE,
-                    },
-                    'createDisposition': 'CREATE_IF_NEEDED',
-                    'writeDisposition': 'WRITE_TRUNCATE',
-                }
-            },
-        }
-        EXTRACT_DATA = {
-            'id': '%s:%s' % (PROJECT, 'extract_job'),
-            'jobReference': {
-                'projectId': PROJECT,
-                'jobId': 'extract_job',
-            },
-            'state': 'DONE',
-            'configuration': {
-                'extract': {
-                    'sourceTable': {
-                        'projectId': PROJECT,
-                        'datasetId': DATASET,
-                        'tableId': SOURCE_TABLE,
-                    },
-                    'destinationUris': [DESTINATION_URI],
-                }
-            },
-        }
-        COPY_DATA = {
-            'id': '%s:%s' % (PROJECT, 'copy_job'),
-            'jobReference': {
-                'projectId': PROJECT,
-                'jobId': 'copy_job',
-            },
-            'state': 'DONE',
-            'configuration': {
-                'copy': {
-                    'sourceTables': [{
-                        'projectId': PROJECT,
-                        'datasetId': DATASET,
-                        'tableId': SOURCE_TABLE,
-                    }],
-                    'destinationTable': {
-                        'projectId': PROJECT,
-                        'datasetId': DATASET,
-                        'tableId': DESTINATION_TABLE,
-                    },
-                }
-            },
-        }
-        LOAD_DATA = {
-            'id': '%s:%s' % (PROJECT, 'load_job'),
-            'jobReference': {
-                'projectId': PROJECT,
-                'jobId': 'load_job',
-            },
-            'state': 'DONE',
-            'configuration': {
-                'load': {
-                    'destinationTable': {
-                        'projectId': PROJECT,
-                        'datasetId': DATASET,
-                        'tableId': SOURCE_TABLE,
-                    },
-                    'sourceUris': [SOURCE_URI],
-                }
-            },
-        }
-        DATA = {
-            'nextPageToken': TOKEN,
-            'jobs': [
-                ASYNC_QUERY_DATA,
-                EXTRACT_DATA,
-                COPY_DATA,
-                LOAD_DATA,
-            ]
-        }
-        creds = _make_credentials()
-        client = self._make_one(PROJECT, creds)
-        conn = client._connection = _Connection(DATA)
+        })
 
-        iterator = client.list_jobs()
-        page = six.next(iterator.pages)
-        jobs = list(page)
-        token = iterator.next_page_token
-
-        self.assertEqual(len(jobs), len(DATA['jobs']))
-        for found, expected in zip(jobs, DATA['jobs']):
-            name = expected['jobReference']['jobId']
-            self.assertIsInstance(found, JOB_TYPES[name])
-            self.assertEqual(found.name, name)
-        self.assertEqual(token, TOKEN)
-
-        self.assertEqual(len(conn._requested), 1)
-        req = conn._requested[0]
-        self.assertEqual(req['method'], 'GET')
-        self.assertEqual(req['path'], '/%s' % PATH)
-        self.assertEqual(req['query_params'], {'projection': 'full'})
-
-    def test_list_jobs_load_job_wo_sourceUris(self):
-        import six
-        from google.cloud.bigquery.job import LoadTableFromStorageJob
+    def test_list_subscriptions_w_missing_key(self):
         PROJECT = 'PROJECT'
-        DATASET = 'test_dataset'
-        SOURCE_TABLE = 'source_table'
-        JOB_TYPES = {
-            'load_job': LoadTableFromStorageJob,
-        }
-        PATH = 'projects/%s/jobs' % PROJECT
-        TOKEN = 'TOKEN'
-        LOAD_DATA = {
-            'id': '%s:%s' % (PROJECT, 'load_job'),
-            'jobReference': {
-                'projectId': PROJECT,
-                'jobId': 'load_job',
-            },
-            'state': 'DONE',
-            'configuration': {
-                'load': {
-                    'destinationTable': {
-                        'projectId': PROJECT,
-                        'datasetId': DATASET,
-                        'tableId': SOURCE_TABLE,
-                    },
-                }
-            },
-        }
-        DATA = {
-            'nextPageToken': TOKEN,
-            'jobs': [
-                LOAD_DATA,
-            ]
-        }
         creds = _make_credentials()
-        client = self._make_one(PROJECT, creds)
-        conn = client._connection = _Connection(DATA)
 
-        iterator = client.list_jobs()
-        page = six.next(iterator.pages)
-        jobs = list(page)
-        token = iterator.next_page_token
+        client = self._make_one(project=PROJECT, credentials=creds)
+        client._connection = object()
+        api = client._subscriber_api = _FauxSubscriberAPI()
+        api._list_subscriptions_response = (), None
 
-        self.assertEqual(len(jobs), len(DATA['jobs']))
-        for found, expected in zip(jobs, DATA['jobs']):
-            name = expected['jobReference']['jobId']
-            self.assertIsInstance(found, JOB_TYPES[name])
-            self.assertEqual(found.name, name)
-        self.assertEqual(token, TOKEN)
+        subscriptions, next_page_token = client.list_subscriptions()
 
-        self.assertEqual(len(conn._requested), 1)
-        req = conn._requested[0]
-        self.assertEqual(req['method'], 'GET')
-        self.assertEqual(req['path'], '/%s' % PATH)
-        self.assertEqual(req['query_params'], {'projection': 'full'})
+        self.assertEqual(len(subscriptions), 0)
+        self.assertIsNone(next_page_token)
 
-    def test_list_jobs_explicit_missing(self):
-        import six
+        self.assertEqual(api._listed_subscriptions,
+                         (self.PROJECT, None, None))
+
+    def test_topic(self):
         PROJECT = 'PROJECT'
-        PATH = 'projects/%s/jobs' % PROJECT
-        DATA = {}
-        TOKEN = 'TOKEN'
+        TOPIC_NAME = 'TOPIC_NAME'
         creds = _make_credentials()
-        client = self._make_one(PROJECT, creds)
-        conn = client._connection = _Connection(DATA)
 
-        iterator = client.list_jobs(max_results=1000, page_token=TOKEN,
-                                    all_users=True, state_filter='done')
-        page = six.next(iterator.pages)
-        jobs = list(page)
-        token = iterator.next_page_token
+        client_obj = self._make_one(project=PROJECT, credentials=creds)
+        new_topic = client_obj.topic(TOPIC_NAME)
+        self.assertEqual(new_topic.name, TOPIC_NAME)
+        self.assertIs(new_topic._client, client_obj)
+        self.assertEqual(new_topic.project, PROJECT)
+        self.assertEqual(new_topic.full_name,
+                         'projects/%s/topics/%s' % (PROJECT, TOPIC_NAME))
+        self.assertFalse(new_topic.timestamp_messages)
 
-        self.assertEqual(len(jobs), 0)
-        self.assertIsNone(token)
 
-        self.assertEqual(len(conn._requested), 1)
-        req = conn._requested[0]
-        self.assertEqual(req['method'], 'GET')
-        self.assertEqual(req['path'], '/%s' % PATH)
-        self.assertEqual(req['query_params'],
-                         {'projection': 'full',
-                          'maxResults': 1000,
-                          'pageToken': TOKEN,
-                          'allUsers': True,
-                          'stateFilter': 'done'})
+class _Iterator(object):
 
-    def test_load_table_from_storage(self):
-        from google.cloud.bigquery.job import LoadTableFromStorageJob
-        PROJECT = 'PROJECT'
-        JOB = 'job_name'
-        DATASET = 'dataset_name'
-        DESTINATION = 'destination_table'
-        SOURCE_URI = 'http://example.com/source.csv'
-        creds = _make_credentials()
-        http = object()
-        client = self._make_one(project=PROJECT, credentials=creds, http=http)
-        dataset = client.dataset(DATASET)
-        destination = dataset.table(DESTINATION)
-        job = client.load_table_from_storage(JOB, destination, SOURCE_URI)
-        self.assertIsInstance(job, LoadTableFromStorageJob)
-        self.assertIs(job._client, client)
-        self.assertEqual(job.name, JOB)
-        self.assertEqual(list(job.source_uris), [SOURCE_URI])
-        self.assertIs(job.destination, destination)
+    def __init__(self, items, token):
+        self._items = items or ()
+        self.next_page_token = token
 
-    def test_copy_table(self):
-        from google.cloud.bigquery.job import CopyJob
-        PROJECT = 'PROJECT'
-        JOB = 'job_name'
-        DATASET = 'dataset_name'
-        SOURCE = 'source_table'
-        DESTINATION = 'destination_table'
-        creds = _make_credentials()
-        http = object()
-        client = self._make_one(project=PROJECT, credentials=creds, http=http)
-        dataset = client.dataset(DATASET)
-        source = dataset.table(SOURCE)
-        destination = dataset.table(DESTINATION)
-        job = client.copy_table(JOB, destination, source)
-        self.assertIsInstance(job, CopyJob)
-        self.assertIs(job._client, client)
-        self.assertEqual(job.name, JOB)
-        self.assertEqual(list(job.sources), [source])
-        self.assertIs(job.destination, destination)
+    def __iter__(self):
+        return iter(self._items)
 
-    def test_extract_table_to_storage(self):
-        from google.cloud.bigquery.job import ExtractTableToStorageJob
-        PROJECT = 'PROJECT'
-        JOB = 'job_name'
-        DATASET = 'dataset_name'
-        SOURCE = 'source_table'
-        DESTINATION = 'gs://bucket_name/object_name'
-        creds = _make_credentials()
-        http = object()
-        client = self._make_one(project=PROJECT, credentials=creds, http=http)
-        dataset = client.dataset(DATASET)
-        source = dataset.table(SOURCE)
-        job = client.extract_table_to_storage(JOB, source, DESTINATION)
-        self.assertIsInstance(job, ExtractTableToStorageJob)
-        self.assertIs(job._client, client)
-        self.assertEqual(job.name, JOB)
-        self.assertEqual(job.source, source)
-        self.assertEqual(list(job.destination_uris), [DESTINATION])
 
-    def test_run_async_query_defaults(self):
-        from google.cloud.bigquery.job import QueryJob
-        PROJECT = 'PROJECT'
-        JOB = 'job_name'
-        QUERY = 'select count(*) from persons'
-        creds = _make_credentials()
-        http = object()
-        client = self._make_one(project=PROJECT, credentials=creds, http=http)
-        job = client.run_async_query(JOB, QUERY)
-        self.assertIsInstance(job, QueryJob)
-        self.assertIs(job._client, client)
-        self.assertEqual(job.name, JOB)
-        self.assertEqual(job.query, QUERY)
-        self.assertEqual(job.udf_resources, [])
-        self.assertEqual(job.query_parameters, [])
+class _FauxPublisherAPI(object):
 
-    def test_run_async_w_udf_resources(self):
-        from google.cloud.bigquery._helpers import UDFResource
-        from google.cloud.bigquery.job import QueryJob
-        RESOURCE_URI = 'gs://some-bucket/js/lib.js'
-        PROJECT = 'PROJECT'
-        JOB = 'job_name'
-        QUERY = 'select count(*) from persons'
-        creds = _make_credentials()
-        http = object()
-        client = self._make_one(project=PROJECT, credentials=creds, http=http)
-        udf_resources = [UDFResource("resourceUri", RESOURCE_URI)]
-        job = client.run_async_query(JOB, QUERY, udf_resources=udf_resources)
-        self.assertIsInstance(job, QueryJob)
-        self.assertIs(job._client, client)
-        self.assertEqual(job.name, JOB)
-        self.assertEqual(job.query, QUERY)
-        self.assertEqual(job.udf_resources, udf_resources)
-        self.assertEqual(job.query_parameters, [])
+    def __init__(self, items=None, token=None):
+        self._items = items
+        self._token = token
 
-    def test_run_async_w_query_parameters(self):
-        from google.cloud.bigquery._helpers import ScalarQueryParameter
-        from google.cloud.bigquery.job import QueryJob
-        PROJECT = 'PROJECT'
-        JOB = 'job_name'
-        QUERY = 'select count(*) from persons'
-        creds = _make_credentials()
-        http = object()
-        client = self._make_one(project=PROJECT, credentials=creds, http=http)
-        query_parameters = [ScalarQueryParameter('foo', 'INT64', 123)]
-        job = client.run_async_query(JOB, QUERY,
-                                     query_parameters=query_parameters)
-        self.assertIsInstance(job, QueryJob)
-        self.assertIs(job._client, client)
-        self.assertEqual(job.name, JOB)
-        self.assertEqual(job.query, QUERY)
-        self.assertEqual(job.udf_resources, [])
-        self.assertEqual(job.query_parameters, query_parameters)
+    def list_topics(self, project, page_size, page_token):
+        self._listed_topics = (project, page_size, page_token)
+        return _Iterator(self._items, self._token)
 
-    def test_run_sync_query_defaults(self):
-        from google.cloud.bigquery.query import QueryResults
-        PROJECT = 'PROJECT'
-        QUERY = 'select count(*) from persons'
-        creds = _make_credentials()
-        http = object()
-        client = self._make_one(project=PROJECT, credentials=creds, http=http)
-        query = client.run_sync_query(QUERY)
-        self.assertIsInstance(query, QueryResults)
-        self.assertIs(query._client, client)
-        self.assertIsNone(query.name)
-        self.assertEqual(query.query, QUERY)
-        self.assertEqual(query.udf_resources, [])
-        self.assertEqual(query.query_parameters, [])
 
-    def test_run_sync_query_w_udf_resources(self):
-        from google.cloud.bigquery._helpers import UDFResource
-        from google.cloud.bigquery.query import QueryResults
-        RESOURCE_URI = 'gs://some-bucket/js/lib.js'
-        PROJECT = 'PROJECT'
-        QUERY = 'select count(*) from persons'
-        creds = _make_credentials()
-        http = object()
-        client = self._make_one(project=PROJECT, credentials=creds, http=http)
-        udf_resources = [UDFResource("resourceUri", RESOURCE_URI)]
-        query = client.run_sync_query(QUERY, udf_resources=udf_resources)
-        self.assertIsInstance(query, QueryResults)
-        self.assertIs(query._client, client)
-        self.assertIsNone(query.name)
-        self.assertEqual(query.query, QUERY)
-        self.assertEqual(query.udf_resources, udf_resources)
-        self.assertEqual(query.query_parameters, [])
+class _FauxSubscriberAPI(object):
 
-    def test_run_sync_query_w_query_parameters(self):
-        from google.cloud.bigquery._helpers import ScalarQueryParameter
-        from google.cloud.bigquery.query import QueryResults
-        PROJECT = 'PROJECT'
-        QUERY = 'select count(*) from persons'
-        creds = _make_credentials()
-        http = object()
-        client = self._make_one(project=PROJECT, credentials=creds, http=http)
-        query_parameters = [ScalarQueryParameter('foo', 'INT64', 123)]
-        query = client.run_sync_query(QUERY, query_parameters=query_parameters)
-        self.assertIsInstance(query, QueryResults)
-        self.assertIs(query._client, client)
-        self.assertIsNone(query.name)
-        self.assertEqual(query.query, QUERY)
-        self.assertEqual(query.udf_resources, [])
-        self.assertEqual(query.query_parameters, query_parameters)
+    def list_subscriptions(self, project, page_size, page_token):
+        self._listed_subscriptions = (project, page_size, page_token)
+        return self._list_subscriptions_response
 
 
 class _Connection(object):
 
+    _called_with = None
+
     def __init__(self, *responses):
         self._responses = responses
-        self._requested = []
 
     def api_request(self, **kw):
-        self._requested.append(kw)
+        self._called_with = kw
         response, self._responses = self._responses[0], self._responses[1:]
         return response
