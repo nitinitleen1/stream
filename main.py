@@ -138,20 +138,28 @@ class PublishHandler(webapp2.RequestHandler):
         s=urllib.unquote(s).decode('utf8')
         #self.response.write(s)
         pubsub_client = pubsub.Client()
-        try:
-            start = s.index('&') + len('&')
-            end = s.index('&_', start )
-            b1=s[start:end]
-            #bq=parse.unquotes(b1)
-            b1=b1.replace("'",'"')
-        except:
-            return
+        
+        start = s.index('&') + len('&')
+        end = s.index('&_', start )
+        b1=s[start:end]
+        #bq=parse.unquotes(b1)
+        b1=b1.replace("'",'"')
+        
+        b=json.loads(b1,object_pairs_hook=OrderedDict)
+        timestamp=time.strftime("%c")
+        b['timestamp']=timestamp
+        a= json.dumps(b)
+        c=str(a)
+        logging.debug('json decoded')
+            
         #logging.debug(b1)                            
         #for topic in pubsub_client.list_topics():
         #    if topic.name=='my-new-topic':
         #        flag=0        
         topic_name = 'my-new-topic'
         topic = pubsub_client.topic(topic_name)
+        #topic.create()
+
         # if flag==0:                                        
         #     topic.create()
         #     print('Topic {} created.'.format(topic.name))
@@ -162,9 +170,9 @@ class PublishHandler(webapp2.RequestHandler):
         
         # else:            
         #     # Data must be a bytestring
-        b1 = b1.encode('utf-8')
+        c = c.encode('utf-8')
 
-        message_id = topic.publish(b1)
+        message_id = topic.publish(c)
 
         logging.debug('Message {} published outside loop.'.format(message_id))
 
@@ -176,14 +184,19 @@ class PublishHandler(webapp2.RequestHandler):
         s=self.request.url
         s=urllib.unquote(s).decode('utf8')
         #self.response.write(s)
-        try:
-            start = s.index('&') + len('&')
-            end = s.index('&_', start )
-            b1=s[start:end]
-            #bq=parse.unquotes(b1)
-            b1=b1.replace("'",'"')
-        except:
-            return
+        
+        start = s.index('&') + len('&')
+        end = s.index('&_', start )
+        b1=s[start:end]
+        #bq=parse.unquotes(b1)
+        b1=b1.replace("'",'"')
+        
+        b=json.loads(b1,object_pairs_hook=OrderedDict)
+        timestamp=time.strftime("%c")
+        b['timestamp']=timestamp
+        a= json.dumps(b)
+        c=str(a)
+        
         
         #for topic in pubsub_client.list_topics():
         #    if topic.name=='my-new-topic':
@@ -200,9 +213,9 @@ class PublishHandler(webapp2.RequestHandler):
         
         # else:            
         #     # Data must be a bytestring
-        b1 = b1.encode('utf-8')
+        c = c.encode('utf-8')
 
-        message_id = topic.publish(b1)
+        message_id = topic.publish(c)
 
         logging.debug('Message {} published.'.format(message_id))        
         
