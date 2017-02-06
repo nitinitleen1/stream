@@ -144,7 +144,7 @@ class PublishHandler(webapp2.RequestHandler):
         b1=s[start:end]
         #bq=parse.unquotes(b1)
         b1=b1.replace("'",'"')
-        b1=urllib.unquote(b1).decode('utf8')
+        #b1=urllib.unquote(b1).decode('utf8')
         b=json.loads(b1,object_pairs_hook=OrderedDict)
         timestamp=time.strftime("%c")
         b['timestamp']=timestamp
@@ -190,7 +190,7 @@ class PublishHandler(webapp2.RequestHandler):
         b1=s[start:end]
         #bq=parse.unquotes(b1)
         b1=b1.replace("'",'"')
-        b1=urllib.unquote(b1).decode('utf8')
+        #b1=urllib.unquote(b1).decode('utf8')
         b=json.loads(b1,object_pairs_hook=OrderedDict)
         timestamp=time.strftime("%c")
         b['timestamp']=timestamp
