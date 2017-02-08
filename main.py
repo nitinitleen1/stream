@@ -5,6 +5,12 @@ from collections import OrderedDict
 from google.cloud import bigquery
 from google.appengine.api import memcache, taskqueue
 from datetime import date, timedelta
+#from google.appengine.api import urlfetch
+
+
+
+#urlfetch.set_default_fetch_deadline(15)
+
 
 
 def sync_query(query):
