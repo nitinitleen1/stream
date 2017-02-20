@@ -6,10 +6,11 @@ import json,time
 from google.cloud import pubsub
 from collections import OrderedDict
 from google.cloud import bigquery
-from datetime import date, timedelta
+from datetime import date, timedelta,datetime
 from google.cloud import pubsub
 
-
+''' This function listens on topic having subscription named
+	sub2 and fetches it and put it into biqquery'''
 def subscriber():
 	while True:
 		counter=10
@@ -19,7 +20,7 @@ def subscriber():
 			pubsub_client = pubsub.Client()
 			topic_name='my-new-topic'
 			topic = pubsub_client.topic(topic_name)
-			subscription_name='sub1'
+			subscription_name='sub2'
 			subscription = topic.subscription(subscription_name)
 
 			#subscription.create()
@@ -40,6 +41,7 @@ def subscriber():
 			 			#print('* {}: {}, {}'.format(
 			 			        #message.message_id, message.data, message.attributes))
 			 			temp1.append(str(message.data))
+						#print temp1[counter]
 						#var=var+1
 					#print results
 					#print counter
@@ -50,19 +52,18 @@ def subscriber():
 					while (i!=10):	
 						#print len(temp1)
 						#print i
-						#print temp1[i]
+						#print "hello"
 						try:
-							b = json.loads(temp1[i])
-							#print('json load: {}'.format(b)) 
-						except:
-							print('Cannot able to load')
-							print i
-						
-						try:
+							#print "loop ke ander"
+							b = json.loads(temp1[i],object_pairs_hook=OrderedDict)
+							#print('json load: {}'.format(b)) 			
 							#defing dataset variables
 							dataset_name = 'searce_poc_vuukle'
 							table_name   = 'page_impressions'
-							today = b["timestamp"]
+							#print "date ke pehle"
+							loc = datetime.strptime(b['timestamp'],"%Y-%m-%d %H:%M:%S")
+							print loc
+							today=loc.strftime("%Y%m%d")
 							table_name = "%s$%s"%(table_name, today)
 
 							#print "hello1"
@@ -90,7 +91,7 @@ def subscriber():
 							else:
 								logging.error(errors)
 						except:
-							print "cannot load"		
+							print "could not load"		
 						i=i+1	
 					
 

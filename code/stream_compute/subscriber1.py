@@ -62,7 +62,7 @@ def subscriber():
 							#defing dataset variables
 							dataset_name = 'searce_poc_vuukle'
 							table_name   = 'page_impressions'
-							today = b["timestamp"]
+							today = date.today().strftime("%Y%m%d")
 							table_name = "%s$%s"%(table_name, today)
 
 							#print "hello1"

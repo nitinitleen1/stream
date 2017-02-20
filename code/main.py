@@ -9,11 +9,10 @@ from google.appengine.api import urlfetch
 
 
 
-pubsub_client = pubsub.Client()
-topic_name = 'my-new-topic'
-topic = pubsub_client.topic(topic_name)
 
-#fuction to test the query parameters i.e just for testing
+
+
+
 def sync_query(query):
     client = bigquery.Client()
     query_results = client.run_sync_query(query)
@@ -43,9 +42,9 @@ def sync_query(query):
 
     return bqdata
 
-''' function to actually stream the json payload into the 
-	biqquery table to by using the global function insert_all'''
-def stream_data(dataset_name, table_name, json_data, ip,time_stamp = time.strftime("%c")):
+
+
+def stream_data(dataset_name, table_name, json_data, time_stamp = time.strftime("%c")):
     bigquery_client = bigquery.Client()
     dataset = bigquery_client.dataset(dataset_name)
     table = dataset.table(table_name)
@@ -53,7 +52,6 @@ def stream_data(dataset_name, table_name, json_data, ip,time_stamp = time.strfti
     time_stamp1=time.strftime("%c")
 
     data['timestamp'] = time_stamp1
-    data['Ipaddress']=ip
 
     # Reload the table to get the schema.
     table.reload()
@@ -70,9 +68,6 @@ def stream_data(dataset_name, table_name, json_data, ip,time_stamp = time.strfti
     else:
         logging.error(errors)
 
-
-''' This handler is called when the given request is /bqstreamer 
-	Uses taskqueue to call another handler as post request'''
 class MainHandler(webapp2.RequestHandler):
     def get(self):
         self.response.headers.add_header("Access-Control-Allow-Origin", "*")
@@ -84,10 +79,9 @@ class MainHandler(webapp2.RequestHandler):
         end = s.index('&_', start )
         b1=s[start:end]
         #bq=parse.unquotes(b1)
-        b1=b1.replace("'",'"')
-        ip=self.request.remote_addr                    
+        b1=b1.replace("'",'"')                    
         
-        task = taskqueue.add(url='/bq-task', params={'bq': b1, 'ts': str(time.time()), 'Ip':ip})
+        task = taskqueue.add(url='/bq-task', params={'bq': b1, 'ts': str(time.time())})
         
         
 
@@ -116,17 +110,12 @@ class MainHandler(webapp2.RequestHandler):
         #self.response.write(b)
         task = taskqueue.add(url='/bq-task', params={'bq': b1, 'ts': str(time.time())})
 
-
-        
-'''Handler gets post reequest from the MainHandler and call stream
-   data to insert the data into the biqquery''' 
 class BqHandler(webapp2.RequestHandler):
     def post(self):
 
         ## get example.com/bq-task?bq=blah
         b1 = self.request.get("bq")
         ts = self.request.get("ts")
-        ip= self.request.get("Ip")
         try:
             b = json.loads(b1,object_pairs_hook=OrderedDict)
             logging.debug('json load: {}'.format(b)) 
@@ -143,7 +132,7 @@ class BqHandler(webapp2.RequestHandler):
 
             tableId = "%s$%s"%(tableId, today)
 
-            stream_data(datasetId, tableId, b,ip, ts)
+            stream_data(datasetId, tableId, b, ts)
 
 
 
@@ -155,7 +144,7 @@ class PublishHandler(webapp2.RequestHandler):
         s=self.request.url
         s=urllib.unquote(s).decode('utf8')
         #self.response.write(s)
-
+        pubsub_client = pubsub.Client()
         
         start = s.index('&') + len('&')
         end = s.index('&_', start )
@@ -164,10 +153,8 @@ class PublishHandler(webapp2.RequestHandler):
         b1=b1.replace("'",'"')
         #b1=json.dumps(b1)
         b=json.loads(b1,object_pairs_hook=OrderedDict,strict=False)
-        timestamp=time.strftime("%Y-%m-%d %H:%M:%S")
+        timestamp=time.strftime("%c")
         b['timestamp']=timestamp
-        Ip= self.request.remote_addr
-        b['Ipaddress']=Ip
         a= json.dumps(b)
         c=str(a)
         logging.debug('json decoded')
@@ -176,7 +163,8 @@ class PublishHandler(webapp2.RequestHandler):
         #for topic in pubsub_client.list_topics():
         #    if topic.name=='my-new-topic':
         #        flag=0        
-
+        topic_name = 'my-new-topic'
+        topic = pubsub_client.topic(topic_name)
         #topic.create()
 
         # if flag==0:                                        
@@ -211,7 +199,7 @@ class PublishHandler(webapp2.RequestHandler):
         b1=b1.replace("'",'"')
         #b1=json.dumps(b1)
         b=json.loads(b1,object_pairs_hook=OrderedDict,strict=False)
-        timestamp=time.strftime("%Y-%m-%d %H:%M:%S")
+        timestamp=time.strftime("%c")
         b['timestamp']=timestamp
         a= json.dumps(b)
         c=str(a)
