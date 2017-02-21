@@ -212,7 +212,7 @@ class PublishHandler(webapp2.RequestHandler):
         #b1=json.dumps(b1)
         b=json.loads(b1,object_pairs_hook=OrderedDict,strict=False)
         timestamp=time.strftime("%Y-%m-%d %H:%M:%S")
-        b['timestamp']=timestamp
+        b['PAGE_VIEW_TIMESTAMP']=timestamp
         a= json.dumps(b)
         c=str(a)
         
