@@ -29,7 +29,7 @@ def subscriber():
         try:
                    
             dataset_name = 'searce_poc_vuukle'
-            table_name   = 'page_impressions'
+            table_name   = 'page_impression_logs'
             today = date.today().strftime("%Y%m%d")
             table_name = "%s$%s"%(table_name, today)
 
@@ -57,7 +57,7 @@ def subscriber():
                 logging.error(errors)
         except:
             print "could not load"
-            i=i+1
+            #i=i+1
         if results:
             subscription.acknowledge([ack_id for ack_id, message in results])
             #print( "one acknowledged")

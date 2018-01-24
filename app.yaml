@@ -9,5 +9,5 @@ handlers:
 #[START env]
 env_variables:
   DATASET_ID: searce_poc_vuukle
-  TABLE_ID: page_impressions
+  TABLE_ID: page_impression_logs
 #[END env]

@@ -12,9 +12,9 @@ from google.cloud import pubsub
 
 def subscriber():
     pubsub_client = pubsub.Client()
-    topic_name='my-new-topic'
+    topic_name='vuukle-messages'
     topic = pubsub_client.topic(topic_name)
-    subscription_name='sub2'
+    subscription_name='sub3'
     subscription = topic.subscription(subscription_name)
 
     while True:
@@ -29,13 +29,14 @@ def subscriber():
         try:
                    
             dataset_name = 'searce_poc_vuukle'
-            table_name   = 'page_impressions'
+            table_name   = 'page_impression_logs'
             #today = date.today().strftime("%Y%m%d")
-            data1 = json.loads(temp1[i],object_pairs_hook=OrderedDict)
-            loc = datetime.strptime(data1[0]['timestamp'],"%Y-%m-%d %H:%M:%S")
+            data1 = json.loads(temp1[0],object_pairs_hook=OrderedDict)
+            loc = datetime.strptime(data1['PAGE_VIEW_TIMESTAMP'],"%Y-%m-%d %H:%M:%S")
             #print loc
             today=loc.strftime("%Y%m%d")
             table_name = "%s$%s"%(table_name, today)
+            #print table_name
 
             #putting data into bigquery
             bigquery_client = bigquery.Client()
@@ -43,6 +44,7 @@ def subscriber():
             table = dataset.table(table_name)
             table.reload()
             records = []
+        #print "hello"
             for i in range(0,len(temp1)):
                 data = json.loads(temp1[i],object_pairs_hook=OrderedDict)
                     
@@ -54,7 +56,8 @@ def subscriber():
                     #rows = [data]
                     #print rows
                 records.append(temp)
-                #i=i+1
+            
+        #print "hello"    #i=i+1
             errors = table.insert_data(records)
             if not errors:
                 logging.debug('Loaded 1 row into {}:{}'.format(dataset_name, table_name))
