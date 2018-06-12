@@ -69,120 +69,13 @@ Install Dependencies
 
 Samples
 -------------------------------------------------------------------------------
-
-Quickstart
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-
-To run this sample:
+To run this sample on Compute Engine:
 
 .. code-block:: bash
 
-    $ python quickstart.py
-
-
-Publisher
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-
-To run this sample:
-
-.. code-block:: bash
-
-    $ python publisher.py
-
-    usage: publisher.py [-h] {list,create,delete,publish} ...
+    $ python rSub.py
     
-    This application demonstrates how to perform basic operations on topics
-    with the Cloud Pub/Sub API.
-    
-    For more information, see the README.md under /pubsub and the documentation
-    at https://cloud.google.com/pubsub/docs.
-    
-    positional arguments:
-      {list,create,delete,publish}
-        list                Lists all Pub/Sub topics in the current project.
-        create              Create a new Pub/Sub topic.
-        delete              Deletes an existing Pub/Sub topic.
-        publish             Publishes a message to a Pub/Sub topic with the given
-                            data.
-    
-    optional arguments:
-      -h, --help            show this help message and exit
-
-
-Subscribers
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-
-To run this sample:
-
-.. code-block:: bash
-
-    $ python subscriber.py
-
-    usage: subscriber.py [-h] {list,create,delete,receive} ...
-    
-    This application demonstrates how to perform basic operations on
-    subscriptions with the Cloud Pub/Sub API.
-    
-    For more information, see the README.md under /pubsub and the documentation
-    at https://cloud.google.com/pubsub/docs.
-    
-    positional arguments:
-      {list,create,delete,receive}
-        list                Lists all subscriptions for a given topic.
-        create              Create a new pull subscription on the given topic.
-        delete              Deletes an existing Pub/Sub topic.
-        receive             Receives a message from a pull subscription.
-    
-    optional arguments:
-      -h, --help            show this help message and exit
-
-
-Identity and Access Management
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-
-To run this sample:
-
-.. code-block:: bash
-
-    $ python iam.py
-
-    usage: iam.py [-h]
-                  {get-topic-policy,get-subscription-policy,set-topic-policy,set-subscription-policy,check-topic-permissions,check-subscription-permissions}
-                  ...
-    
-    This application demonstrates how to perform basic operations on IAM
-    policies with the Cloud Pub/Sub API.
-    
-    For more information, see the README.md under /pubsub and the documentation
-    at https://cloud.google.com/pubsub/docs.
-    
-    positional arguments:
-      {get-topic-policy,get-subscription-policy,set-topic-policy,set-subscription-policy,check-topic-permissions,check-subscription-permissions}
-        get-topic-policy    Prints the IAM policy for the given topic.
-        get-subscription-policy
-                            Prints the IAM policy for the given subscription.
-        set-topic-policy    Sets the IAM policy for a topic.
-        set-subscription-policy
-                            Sets the IAM policy for a topic.
-        check-topic-permissions
-                            Checks to which permissions are available on the given
-                            topic.
-        check-subscription-permissions
-                            Checks to which permissions are available on the given
-                            subscription.
-    
-    optional arguments:
-      -h, --help            show this help message and exit
-
-
+    This application performs insertion of data published from Google App engine to Bigquery API.
 
 
 The client library
