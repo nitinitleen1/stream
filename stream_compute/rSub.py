@@ -20,7 +20,7 @@ def subscriber():
     while True:
         temp1=[]
         #try:
-        results = subscription.pull(return_immediately=True,max_messages=1000)
+        results = subscription.pull(return_immediately=True,max_messages=15)
         print('Received {} messages.'.format(len(results)))
         for ack_id, message in results:
             #print('* {}: {}, {}'.format(message.message_id, message.data, message.attributes))
@@ -28,46 +28,58 @@ def subscriber():
                  
         try:
                    
-            dataset_name = 'searce_poc_vuukle'
+            dataset_name = 'vuukle_dataset'
             table_name   = 'page_impression_logs'
             #today = date.today().strftime("%Y%m%d")
             data1 = json.loads(temp1[0],object_pairs_hook=OrderedDict)
             loc = datetime.strptime(data1['PAGE_VIEW_TIMESTAMP'],"%Y-%m-%d %H:%M:%S")
-            #print loc
+
             today=loc.strftime("%Y%m%d")
             table_name = "%s$%s"%(table_name, today)
-            #print table_name
 
             #putting data into bigquery
             bigquery_client = bigquery.Client()
             dataset = bigquery_client.dataset(dataset_name)
             table = dataset.table(table_name)
             table.reload()
+            schema = table.schema
+            schema_names = [o.name for o in schema]
             records = []
-        #print "hello"
             for i in range(0,len(temp1)):
                 data = json.loads(temp1[i],object_pairs_hook=OrderedDict)
-                    
                         
                 ## get the names of schema
                 temp=list()
-                for key in data:
-                    temp.append(data[key])
-                    #rows = [data]
-                    #print rows
+                for key in schema_names:
+                     if data.has_key(key):
+			   if key == "referrer":
+                                if type(data[key]) is list:
+                                        data[key]= " "
+                                else:
+                                        data[key]= data[key]
+		           temp.append(data[key])
+		           #rows = c[key]
+		#print rows
+	             else:
+		           temp.append(" ") 
                 records.append(temp)
-            
-        #print "hello"    #i=i+1
-            errors = table.insert_data(records)
+                
+    
+            try:
+               errors = table.insert_data(records)
+            except:
+               print "not done"
             if not errors:
                 logging.debug('Loaded 1 row into {}:{}'.format(dataset_name, table_name))
             else:
                 logging.error(errors)
-        except:
-            print "could not load"
+            if results:
+                subscription.acknowledge([ack_id for ack_id, message in results])
+        except: 
+            print "done doing"
             #i=i+1
-        if results:
-            subscription.acknowledge([ack_id for ack_id, message in results])
+        #if results:
+        #    subscription.acknowledge([ack_id for ack_id, message in results])
             #print( "one acknowledged")
         #except:
         #    print("next")

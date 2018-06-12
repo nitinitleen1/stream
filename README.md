@@ -1,15 +1,10 @@
-# Stream Google Analytics data to BigQuery via Google App Engine
-
-When you request the URL `/bq-streamer` with the parameter `?bq={'json':'example'}` then it will start a new task to put that JSON into a partitioned table in BigQuery.
-
-The task is activated via a POST request to `/bq-task` with the same JSON as passed to `/bq-streamer`
 
 ## Setup
 
 1. Create a dataset and date partitioned BigQuery table to receive the hits. Probably want to delete data after some time in prod.
 * Create empty table > set table name > add schema > Options: Partitioning to "DAY"
 2. Add any other fields to the table that you wish to send in, the script by default also adds `ts` as a STRING that is a UNIX timestamp so add that too. Any unset fields won't be seen by default.
-3. Edit the `app.yaml` field `env_variables` to your BigQuery details, and your secret code word:
+3. The sample app.yaml files looks like this:
 
 Example:
 
@@ -26,19 +21,18 @@ handlers:
 env_variables:
   DATASET_ID: tests
   TABLE_ID: realtime
-  SECRET_SALT: changethistosomethingunique
 #[END env]
 ```
 
 3. Deploy the app (see below)
-4. Call the `https://your-app-id.appost.com/bq-streamer?bq={"field_name":"field_value", "field_name2":"field_value2"}`  to add the fields to your BigQuery table.
+4. Call the `https://your-app-id.appost.com/bq-publish?callback={"field_name":"field_value", "field_name2":"field_value2"}`  to add the fields to your BigQuery table.
 
-For testing you can call in the browser the URL via `GET` but for production call via `POST` with the body JSON available to the `bq` field.
+For testing you can call in the browser the URL via `GET`.
 
 Other examples:
 
 `
-https://your-app-id.appspot.com/bq-streamer?bq={'bar':'blah5','foo':'hi'}
+https://your-app-id.appspot.com/bq-publish?bq={'bar':'blah5','foo':'hi'}
 `
 
 
@@ -77,26 +71,16 @@ For more information on Python on App Engine:
 
 > https://cloud.google.com/appengine/docs/python
 
-# Quotas and limits
+## Change in the code to capture Server's Data
 
-* Maximum 32MB per HTTP request
-* concurrent task queues: 1000M if paid, 100k if free
-* 500 tasks per second per queue = 1.8M per hour = 43.2M per day
-* 100k rows per second per BQ table
-
+* To capture data of the server's side we need wo to write our code in the get() method of PublisherHandler in main.py and then redeploy the code.
+* This will ensure the entered is correct.
+* Before deploying on live setup it must be tested in the test project.
 
 
 
 
 
-Applications can then use this data for display.  
-
-* `Poll every minute from GoogleSheets` https://cloud.google.com/solutions/real-time/fluentd-bigquery
-* `Js`: http://epochjs.github.io/epoch/
-* https://www.quora.com/What-s-a-good-real-time-data-visualization-framework 
-* http://stackoverflow.com/questions/33480302/creating-a-shiny-app-with-real-time-data
-* http://shiny.rstudio.com/gallery/reactive-poll-and-file-reader.html
-* http://stackoverflow.com/questions/40424407/real-time-chart-on-r-shiny
 
 
 
